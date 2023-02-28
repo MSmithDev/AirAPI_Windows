@@ -1,6 +1,11 @@
 # AirAPI_Windows
 
-This is a work in progress driver for the Nreal Air for native windows support without nebula. The current configuration for fusion has slight drift and needs to be tuned but is functional.
+This is a work in progress driver for the Nreal Air for native windows support without nebula. The current configuration for fusion has slight drift and needs to be tuned but is functional. This project is a colaberataive effort by the community to provide open access to the glasses.
+
+This is made possible by these wonderful people:<br>
+https://github.com/abls <br>
+https://github.com/edwatt <br>
+https://github.com/jakedowns
 
 ## Precompiled
 To use the precompiled [AirAPI_Windows.dll](https://github.com/MSmithDev/AirAPI_Windows/releases) you also need to include hidapi.dll available [here](https://github.com/libusb/hidapi/releases). 
