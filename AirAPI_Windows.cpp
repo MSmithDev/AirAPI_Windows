@@ -38,7 +38,8 @@ HANDLE trackThread;
 hid_device* device;
 
 
-#define SAMPLE_RATE (1000)
+
+#define SAMPLE_RATE (1000) // replace this with actual sample rate
 
 std::mutex mtx;
 
@@ -242,6 +243,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 	air_sample sample = {};
 	ThreadParams* params = static_cast<ThreadParams*>(lpParam);
 	static vec3 ang_vel = {}, accel_vec = {};
+
 
 	// Define calibration (replace with actual calibration data if available)
 	const FusionMatrix gyroscopeMisalignment = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
