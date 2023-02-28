@@ -1,0 +1,3 @@
+[submodule "deps/Fusion"]
+	path = deps/Fusion
+	url = https://github.com/xioTechnologies/Fusion.git
