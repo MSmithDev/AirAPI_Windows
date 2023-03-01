@@ -13,6 +13,7 @@ To use the precompiled [AirAPI_Windows.dll](https://github.com/MSmithDev/AirAPI_
 There is a [demo](https://github.com/MSmithDev/AirAPI_Windows/wiki/Using-with-Unity) in the wiki for use with unity.
 
 # Building from source
+
 ## Getting hidapi
 Get the latest hidapi-win.zip from [here](https://github.com/libusb/hidapi/releases).
 
