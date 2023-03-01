@@ -1,6 +1,4 @@
 [submodule "deps/Fusion"]
 	path = deps/Fusion
 	url = https://github.com/xioTechnologies/Fusion.git
-[submodule "deps/cglm"]
-	path = deps/cglm
-	url = https://github.com/recp/cglm.git
+

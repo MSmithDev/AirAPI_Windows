@@ -1,13 +1,7 @@
 #include "pch.h"
 #include "AirAPI_Windows.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
 #include "deps/hidapi-win/include/hidapi.h"
-#include "deps/cglm/include/cglm/cglm.h"
 #include "deps/Fusion/Fusion/Fusion.h"
-#include <Windows.h>
 #include <iostream>
 #include <mutex>
 
@@ -28,7 +22,6 @@ bool g_isTracking = false;
 #define ACCEL_SCALAR (1.0f / 8388608.0f * 16.0f)
 
 static int rows, cols;
-static versor rotation = GLM_QUAT_IDENTITY_INIT;
 static FusionEuler euler;
 static FusionVector earth;
 static FusionQuaternion qt;
@@ -193,8 +186,9 @@ parse_report(const unsigned char* buffer_in, int size, air_sample* out_sample)
 
 
 static void
-process_ang_vel(const int32_t in_ang_vel[3], vec3 out_vec)
+process_ang_vel(const int32_t in_ang_vel[3], float out_vec[])
 {
+
 	// these scale and bias corrections are all rough guesses
 	out_vec[0] = (float)(in_ang_vel[0]) * -1.0f * GYRO_SCALAR;
 	out_vec[1] = (float)(in_ang_vel[2]) * GYRO_SCALAR;
@@ -202,12 +196,13 @@ process_ang_vel(const int32_t in_ang_vel[3], vec3 out_vec)
 }
 
 static void
-process_accel(const int32_t in_accel[3], vec3 out_vec)
+process_accel(const int32_t in_accel[3], float out_vec[])
 {
 	// these scale and bias corrections are all rough guesses
 	out_vec[0] = (float)(in_accel[0]) * ACCEL_SCALAR;
 	out_vec[1] = (float)(in_accel[2]) * ACCEL_SCALAR;
 	out_vec[2] = (float)(in_accel[1]) * ACCEL_SCALAR;
+	
 }
 
 
@@ -242,7 +237,9 @@ DWORD WINAPI track(LPVOID lpParam) {
 	uint64_t last_sample_tick = 0;
 	air_sample sample = {};
 	ThreadParams* params = static_cast<ThreadParams*>(lpParam);
-	static vec3 ang_vel = {}, accel_vec = {};
+	//static FusionVector ang_vel = {}, accel_vec = {};
+	static float ang_vel[3] = {};
+	static float accel_vec[3] = {};
 
 
 	// Define calibration (replace with actual calibration data if available)
