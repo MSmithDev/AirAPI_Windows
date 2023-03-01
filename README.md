@@ -30,4 +30,18 @@ Open the Project.sln and build the project <br>
 You should have a "deps/Fusion/Fusion/Release/Fusion.lib" file.
 
 ## Build AirAPI_Windows DLL
+
+### Clone this project
+Goto project directory
+```
+cd AirAPI_Windows
+```
+Init sub module
+```
+git submodule init
+```
+update the module
+```
+git submodule update
+```
 Open AirAPI_Windows.sln and make sure "Release" and "x64" are set and build.
