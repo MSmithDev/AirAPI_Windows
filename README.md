@@ -12,7 +12,7 @@ To use the precompiled [AirAPI_Windows.dll](https://github.com/MSmithDev/AirAPI_
 
 [Here](https://github.com/MSmithDev/AirAPI_Windows/wiki/Using-with-Unity) is a demo in the wiki for use with unity scripts.
 
-[Here](https://github.com/MSmithDev/AirPoseUnityDemo) is an Unity demo using the XR plugin with the Airs setup as a headset.
+[Here](https://github.com/MSmithDev/AirPoseUnityDemo) is a Unity demo using the XR plugin with the Airs setup as a headset.
 
 # Building from source
 
