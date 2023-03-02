@@ -10,7 +10,9 @@ https://github.com/jakedowns
 ## Precompiled
 To use the precompiled [AirAPI_Windows.dll](https://github.com/MSmithDev/AirAPI_Windows/releases) you also need to include hidapi.dll available [here](https://github.com/libusb/hidapi/releases). 
 
-There is a [demo](https://github.com/MSmithDev/AirAPI_Windows/wiki/Using-with-Unity) in the wiki for use with unity.
+[Here](https://github.com/MSmithDev/AirAPI_Windows/wiki/Using-with-Unity) is a demo in the wiki for use with unity scripts.
+
+[Here](https://github.com/MSmithDev/AirPoseUnityDemo) is an Unity demo using the XR plugin with the Airs setup as a headset.
 
 # Building from source
 
