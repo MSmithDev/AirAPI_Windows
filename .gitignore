@@ -400,3 +400,6 @@ deps/Fusion
 
 #hidapi library
 deps/hidapi-win
+
+#Fusion
+deps/Fusion
