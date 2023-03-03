@@ -422,8 +422,8 @@ int StartConnection()
 		// open the floodgates
 		uint8_t magic_payload[] = { 0x00, 0xaa, 0xc5, 0xd1, 0x21, 0x42, 0x04, 0x00, 0x19, 0x01 };
 
-		int res = 1;
-		//int res = hid_write(device, magic_payload, sizeof(magic_payload));
+
+		int res = hid_write(device, magic_payload, sizeof(magic_payload));
 		if (res < 0) {
 			std::cout << "Unable to write to device" << std::endl;
 			return 1;
