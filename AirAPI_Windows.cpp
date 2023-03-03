@@ -4,13 +4,18 @@
 #include "deps/Fusion/Fusion/Fusion.h"
 #include <iostream>
 #include <mutex>
-
+#include <array>
+#include <cstdint>
+#include <vector>
 //Air USB VID and PID
 #define AIR_VID 0x3318
 #define AIR_PID 0x0424
 
 //Is Tracking
 bool g_isTracking = false;
+
+//Is Listening
+bool g_isListening = false;
 
 // ticks are in nanoseconds, 1000 Hz packets
 #define TICK_LEN (1.0f / 1E9f)
@@ -27,15 +32,16 @@ static FusionVector earth;
 static FusionQuaternion qt;
 
 HANDLE trackThread;
+HANDLE listenThread;
 
 hid_device* device;
 
-
+hid_device* device4;
 
 #define SAMPLE_RATE (1000) // replace this with actual sample rate
 
 std::mutex mtx;
-
+std::mutex it4;
 
 typedef struct {
 	uint64_t tick;
@@ -202,7 +208,7 @@ process_accel(const int32_t in_accel[3], float out_vec[])
 	out_vec[0] = (float)(in_accel[0]) * ACCEL_SCALAR;
 	out_vec[1] = (float)(in_accel[2]) * ACCEL_SCALAR;
 	out_vec[2] = (float)(in_accel[1]) * ACCEL_SCALAR;
-	
+
 }
 
 
@@ -216,6 +222,28 @@ open_device()
 	while (devs) {
 		if (cur_dev->interface_number == 3) {
 			device = hid_open_path(cur_dev->path);
+			std::cout << "Interface 3 bound" << std::endl;
+			break;
+		}
+
+		cur_dev = cur_dev->next;
+	}
+
+	hid_free_enumeration(devs);
+	return device;
+}
+
+static hid_device*
+open_device4()
+{
+	struct hid_device_info* devs = hid_enumerate(AIR_VID, AIR_PID);
+	struct hid_device_info* cur_dev = devs;
+	hid_device* device = NULL;
+
+	while (devs) {
+		if (cur_dev->interface_number == 4) {
+			device = hid_open_path(cur_dev->path);
+			std::cout << "Interface 4 bound" << std::endl;
 			break;
 		}
 
@@ -269,7 +297,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 			.rejectionTimeout = 5 * SAMPLE_RATE, /* 5 seconds */
 	};
 	FusionAhrsSetSettings(&ahrs, &settings);
-	
+
 
 	while (g_isTracking) {
 
@@ -324,7 +352,51 @@ DWORD WINAPI track(LPVOID lpParam) {
 	}
 	return 0;
 }
+int brightness = 0;
+DWORD WINAPI interface4Handler(LPVOID lpParam) {
+	
+	//get initial brightness from device
+	std::array<uint8_t, 17> initBrightness = { 0x00, 0xfd, 0x1e, 0xb9, 0xf0, 0x68, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03 };
+	hid_write(device4, initBrightness.data(), initBrightness.size());
+	
 
+	while (g_isListening) {
+		std::array<uint8_t, 65> recv = {};
+		int res = hid_read(device4, recv.data(), recv.size());
+		if (res > 0) {
+			switch (recv[22]) {
+
+			case 0x03: //Brightness down press
+				it4.lock();
+				brightness = recv[30];
+				it4.unlock();
+				break;
+
+			case 0x02: //Brightness up press
+				it4.lock();
+				brightness = recv[30];
+				it4.unlock();
+				break;
+			default:
+				//std::cout << "Unknown Packet! " << (int)recv[22] << std::endl;
+				break;
+			}
+
+			switch (recv[15]) {
+
+			case 0x03: //Brightness from cmd
+				it4.lock();
+				brightness = recv[23];
+				it4.unlock();
+				break;
+
+			default:
+				//todo
+				break;
+			}
+		}
+	}
+}
 
 
 int StartConnection()
@@ -339,7 +411,8 @@ int StartConnection()
 		std::cout << "Opening Device" << std::endl;
 		// open device
 		device = open_device();
-		if (!device) {
+		device4 = open_device4();
+		if (!device || !device4) {
 			std::cout << "Unable to open device" << std::endl;
 			return 1;
 		}
@@ -348,23 +421,34 @@ int StartConnection()
 		std::cout << "Sending Payload" << std::endl;
 		// open the floodgates
 		uint8_t magic_payload[] = { 0x00, 0xaa, 0xc5, 0xd1, 0x21, 0x42, 0x04, 0x00, 0x19, 0x01 };
+
+
 		int res = hid_write(device, magic_payload, sizeof(magic_payload));
 		if (res < 0) {
 			std::cout << "Unable to write to device" << std::endl;
 			return 1;
 		}
-		ThreadParams params = { device };
+		ThreadParams trackParams = { device };
 		g_isTracking = true;
-		std::cout << "Starting Thread" << std::endl;
+		std::cout << "Tracking Starting Thread" << std::endl;
 
 
 		//Start Tracking Thread
-		trackThread = CreateThread(NULL, 0, track, &params, 0, NULL);
+		trackThread = CreateThread(NULL, 0, track, &trackParams, 0, NULL);
 		if (trackThread == NULL) {
 			std::cout << "Failed to create thread" << std::endl;
 			return 1;
 		}
-		std::cout << "Thread Started" << std::endl;
+
+		ThreadParams listenParams = { };
+		g_isListening = true;
+		//Start Interface 4 listener
+		listenThread = CreateThread(NULL, 0, interface4Handler, &listenParams, 0, NULL);
+		if (listenThread == NULL) {
+			std::cout << "Failed to create thread" << std::endl;
+			return 1;
+		}
+		std::cout << "Listenr Thread Started" << std::endl;
 
 		return 1;
 	}
@@ -375,10 +459,16 @@ int StopConnection()
 {
 	if (g_isTracking) {
 		g_isTracking = false;
-		// Wait for the thread to finish
+		g_isListening = false;
+		// Wait for the track thread to finish
 		WaitForSingleObject(trackThread, INFINITE);
 		TerminateThread(trackThread, 0);
 		CloseHandle(trackThread);
+
+		// Wait for the listen thread to finish
+		WaitForSingleObject(listenThread, INFINITE);
+		TerminateThread(listenThread, 0);
+		CloseHandle(listenThread);
 		return 1;
 	}
 	else {
@@ -386,9 +476,10 @@ int StopConnection()
 	}
 }
 
+float* q = new float[4];
+
 float* GetQuaternion()
 {
-	float* q = new float[4];
 	mtx.lock();
 	q[0] = qt.array[0];
 	q[1] = qt.array[1];
@@ -398,13 +489,26 @@ float* GetQuaternion()
 	return q;
 }
 
+float* e = new float[3];
+
 float* GetEuler()
 {
-	float* e = new float[3];
+
 	mtx.lock();
 	e[0] = euler.angle.pitch;
 	e[1] = euler.angle.roll;
 	e[2] = euler.angle.yaw;
 	mtx.unlock();
 	return e;
+}
+
+
+int GetBrightness()
+{
+	int curBrightness;
+	it4.lock();
+	curBrightness = brightness;
+	it4.unlock();
+
+	return curBrightness;
 }
