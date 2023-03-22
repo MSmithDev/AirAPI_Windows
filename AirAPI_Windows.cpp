@@ -550,3 +550,13 @@ int SetFusionRejectTimeout(unsigned int timout) {
 	mtx.unlock();
 	return 1;
 }
+
+int GetFusionState() {
+	//TODO: check if initialized/errors/ect return an int value to represent state
+	// 1 finished and running
+	// 0 initializing
+	// -1 error
+	// error counter?
+
+	return 0;
+}
