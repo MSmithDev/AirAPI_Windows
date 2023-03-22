@@ -40,6 +40,16 @@ hid_device* device4;
 
 #define SAMPLE_RATE (1000) // replace this with actual sample rate
 
+FusionAhrs ahrs;
+
+// Set AHRS algorithm settings
+FusionAhrsSettings settings = {
+		.gain = 0.5f,
+		.accelerationRejection = 10.0f,
+		.magneticRejection = 20.0f,
+		.rejectionTimeout = 5 * SAMPLE_RATE, /* 5 seconds */
+};
+
 std::mutex mtx;
 std::mutex it4;
 
@@ -283,20 +293,13 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 	// Initialise algorithms
 	FusionOffset offset;
-	FusionAhrs ahrs;
+
 
 	FusionOffsetInitialise(&offset, SAMPLE_RATE);
+	mtx.lock();
 	FusionAhrsInitialise(&ahrs);
-
-
-	// Set AHRS algorithm settings
-	const FusionAhrsSettings settings = {
-			.gain = 0.5f,
-			.accelerationRejection = 10.0f,
-			.magneticRejection = 20.0f,
-			.rejectionTimeout = 5 * SAMPLE_RATE, /* 5 seconds */
-	};
 	FusionAhrsSetSettings(&ahrs, &settings);
+	mtx.unlock();
 
 
 	while (g_isTracking) {
@@ -340,7 +343,9 @@ DWORD WINAPI track(LPVOID lpParam) {
 		previousTimestamp = timestamp;
 
 		// Update gyroscope AHRS algorithm
+		mtx.lock();
 		FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, deltaTime);
+		mtx.unlock();
 
 		//lock mutex and update values
 		mtx.lock();
@@ -511,4 +516,37 @@ int GetBrightness()
 	it4.unlock();
 
 	return curBrightness;
+}
+
+int SetFusionGain(float gain)
+{
+	mtx.lock();
+	settings.gain = gain;
+	FusionAhrsSetSettings(&ahrs, &settings);
+	mtx.unlock();
+	return 1;
+}
+
+int SetFusionAccelRejection(float accelReject) {
+	mtx.lock();
+	settings.accelerationRejection = accelReject;
+	FusionAhrsSetSettings(&ahrs, &settings);
+	mtx.unlock();
+	return 1;
+}
+
+int SetFusionMagRejection(float magReject) {
+	mtx.lock();
+	settings.magneticRejection = magReject;
+	FusionAhrsSetSettings(&ahrs, &settings);
+	mtx.unlock();
+	return 1;
+}
+
+int SetFusionRejectTimeout(unsigned int timout) {
+	mtx.lock();
+	settings.rejectionTimeout = timout;
+	FusionAhrsSetSettings(&ahrs, &settings);
+	mtx.unlock();
+	return 1;
 }
