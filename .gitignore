@@ -403,3 +403,13 @@ deps/hidapi-win
 
 #Fusion
 deps/Fusion
+
+# build artifacts
+build/
+
+# IDE stuff
+.vscode
+
+# mac stuff
+*.DS_Store
+

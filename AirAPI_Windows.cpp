@@ -1,12 +1,37 @@
+// TODO: post-draft pr, remove bg / investigation comments and links
+
+// macOS-specific includes
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) // http://web.archive.org/web/20191012035921/http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system#BSD
+
+#include "mac.h"
+
+// absolute path for installation via homebrew
+// to install: `brew install hidapi`
+#include "/usr/local/Cellar/hidapi/0.13.1/include/hidapi/hidapi.h"
+#include "deps/Fusion/Fusion/build/include/Fusion.h"
+
+#else
+
+// windows-specific includes
 #include "pch.h"
-#include "AirAPI_Windows.h"
 #include "deps/hidapi-win/include/hidapi.h"
 #include "deps/Fusion/Fusion/Fusion.h"
+
+#endif
+
+// mac & windows adapted
+#include "AirAPI_Windows.h"
+
+// mac & windows compatible
+#include <assert.h>
+#include <pthread.h>
 #include <iostream>
+#include <string>
 #include <mutex>
 #include <array>
 #include <cstdint>
 #include <vector>
+
 //Air USB VID and PID
 #define AIR_VID 0x3318
 #define AIR_PID 0x0424
@@ -31,24 +56,28 @@ static FusionEuler euler;
 static FusionVector earth;
 static FusionQuaternion qt;
 
-HANDLE trackThread;
-HANDLE listenThread;
+pthread_t trackThread;
+pthread_t listenThread;
 
 hid_device* device;
-
 hid_device* device4;
 
 #define SAMPLE_RATE (1000) // replace this with actual sample rate
 
-std::mutex mtx;
-std::mutex it4;
+// task thread mutexs
+pthread_mutex_t mtx;
+pthread_mutex_t it4;
+
+// connection close config
+bool signalled;
+pthread_mutex_t mutex;
+pthread_cond_t cond;
 
 typedef struct {
 	uint64_t tick;
 	int32_t ang_vel[3];
 	int32_t accel[3];
 } air_sample;
-
 
 static int
 parse_report(const unsigned char* buffer_in, int size, air_sample* out_sample)
@@ -187,6 +216,8 @@ parse_report(const unsigned char* buffer_in, int size, air_sample* out_sample)
 		// out_sample->accel[2] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
 	}
 
+	// std::cout << out_sample << std::endl;
+
 	return 0;
 }
 
@@ -254,11 +285,16 @@ open_device4()
 	return device;
 }
 
+// must be of format:
+// const pthread_attr_t *attr
+
 struct ThreadParams {
 	hid_device* device;
 };
 
-DWORD WINAPI track(LPVOID lpParam) {
+// must conform like example:
+// void *worker_thread(void *arg)
+void *track(void *lpParam) {
 
 	//Thread to handle tracking
 	unsigned char buffer[64] = {};
@@ -300,8 +336,6 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 
 	while (g_isTracking) {
-
-
 		try {
 			// code that might throw an exception
 			int res = hid_read(device, buffer, sizeof(buffer));
@@ -310,6 +344,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 			}
 		}
 		catch (const std::exception& e) {
+			signalled = true;
 			// handle the exception
 			std::cerr << e.what();
 		}
@@ -343,18 +378,27 @@ DWORD WINAPI track(LPVOID lpParam) {
 		FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, deltaTime);
 
 		//lock mutex and update values
-		mtx.lock();
+		pthread_mutex_lock(&mtx);
 		qt = FusionAhrsGetQuaternion(&ahrs);
 		euler = FusionQuaternionToEuler(qt);
 		earth = FusionAhrsGetEarthAcceleration(&ahrs);
-		mtx.unlock();
-
+		pthread_mutex_unlock(&mtx);
+		// signal
+		signalled = true;
 	}
 	return 0;
 }
 int brightness = 0;
-DWORD WINAPI interface4Handler(LPVOID lpParam) {
-	
+// needs to conform to void *_Nullable (*_Nonnull)(void *)
+// LPVOID is alias of: void *
+// aka pointer to any type
+//
+// DWORD is typealias of: unsigned int
+// 
+// must be format: void *worker_thread(void *arg)
+void interface4Handler(LPVOID lpParam) {
+	std::cout << "interface4Handler invoked" << std::endl;
+
 	//get initial brightness from device
 	std::array<uint8_t, 17> initBrightness = { 0x00, 0xfd, 0x1e, 0xb9, 0xf0, 0x68, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03 };
 	hid_write(device4, initBrightness.data(), initBrightness.size());
@@ -367,42 +411,54 @@ DWORD WINAPI interface4Handler(LPVOID lpParam) {
 			switch (recv[22]) {
 
 			case 0x03: //Brightness down press
-				it4.lock();
+				pthread_mutex_lock(&it4);
 				brightness = recv[30];
-				it4.unlock();
+				pthread_mutex_unlock(&it4);
+				
+				std::cout << "Brightness: down pressed" << std::endl;
+				// signal
+				signalled = true;
 				break;
 
 			case 0x02: //Brightness up press
-				it4.lock();
+				pthread_mutex_lock(&it4);
 				brightness = recv[30];
-				it4.unlock();
+				pthread_mutex_unlock(&it4);
+				
+				std::cout << "Brightness: up pressed" << std::endl;
+				// signal
+				signalled = true;
 				break;
+
 			default:
-				//std::cout << "Unknown Packet! " << (int)recv[22] << std::endl;
+				std::cout << "Brightness: Unknown Packet! " << (int)recv[22] << std::endl;
 				break;
+
 			}
 
 			switch (recv[15]) {
 
 			case 0x03: //Brightness from cmd
-				it4.lock();
+				pthread_mutex_lock(&it4);
 				brightness = recv[23];
-				it4.unlock();
+				pthread_mutex_unlock(&it4);
+
+				std::cout << "Brightness: from cmd" << std::endl;
+				// signal
+				signalled = true;
 				break;
 
 			default:
-				//todo
+				std::cout << "Brightness: default inner switch case" << std::endl;
 				break;
 			}
 		}
 	}
+
+	signalled = true;
 }
-
-
 int StartConnection()
 {
-
-
 	if (g_isTracking) {
 		std::cout << "Already Tracking" << std::endl;
 		return 1;
@@ -417,7 +473,6 @@ int StartConnection()
 			return 1;
 		}
 
-
 		std::cout << "Sending Payload" << std::endl;
 		// open the floodgates
 		uint8_t magic_payload[] = { 0x00, 0xaa, 0xc5, 0xd1, 0x21, 0x42, 0x04, 0x00, 0x19, 0x01 };
@@ -428,47 +483,90 @@ int StartConnection()
 			std::cout << "Unable to write to device" << std::endl;
 			return 1;
 		}
-		ThreadParams trackParams = { device };
+		std::cout << res << std::endl;
+
+		ThreadParams *trackParamsPtr;
+		trackParamsPtr = (ThreadParams *) malloc(sizeof(ThreadParams));
+		trackParamsPtr->device = { device };
+		
 		g_isTracking = true;
 		std::cout << "Tracking Starting Thread" << std::endl;
-
-
-		//Start Tracking Thread
-		trackThread = CreateThread(NULL, 0, track, &trackParams, 0, NULL);
+		// thread creation
+		pthread_create(&trackThread, NULL, &track, trackParamsPtr);
+		
 		if (trackThread == NULL) {
-			std::cout << "Failed to create thread" << std::endl;
+			std::cout << "Failed to create tracking thread" << std::endl;
 			return 1;
 		}
+		std::cout << "Tracking Thread Started" << std::endl;
 
-		ThreadParams listenParams = { };
+		ThreadParams *listenParamsPtr;
+		listenParamsPtr = (ThreadParams *) malloc(sizeof(ThreadParams));
+		listenParamsPtr->device = { };
+
 		g_isListening = true;
-		//Start Interface 4 listener
-		listenThread = CreateThread(NULL, 0, interface4Handler, &listenParams, 0, NULL);
+		std::cout << "Listening Starting Thread" << std::endl;
+
+		// thread creation
+		pthread_create(&listenThread, NULL, &track, listenParamsPtr);
 		if (listenThread == NULL) {
-			std::cout << "Failed to create thread" << std::endl;
+			std::cout << "Failed to create listening thread" << std::endl;
 			return 1;
 		}
-		std::cout << "Listenr Thread Started" << std::endl;
-
+		std::cout << "Listener Thread Started" << std::endl;
 		return 1;
 	}
 }
 
 
+// FOR REVIEW:
+// I have implemented pthread to 
+// deal with thread management since this is
+// not windows.. problem is, this is the bounds
+// of what I know at the moment and need a little 
+// help successfully / properly closing these threads.
+// 
+// Please review my implementation of pthread and lmk
+// what needs changing, the processes seem to exit,
+// but produce a crash when working with the library
+// in swift (via Objective-C, will share the macOS project
+// for that next.
 int StopConnection()
 {
 	if (g_isTracking) {
 		g_isTracking = false;
 		g_isListening = false;
+		// need to convert to GCC compatible for macOS
 		// Wait for the track thread to finish
-		WaitForSingleObject(trackThread, INFINITE);
-		TerminateThread(trackThread, 0);
-		CloseHandle(trackThread);
+		std::cout << "stopping connection" << std::endl;
 
-		// Wait for the listen thread to finish
-		WaitForSingleObject(listenThread, INFINITE);
-		TerminateThread(listenThread, 0);
-		CloseHandle(listenThread);
+		// init condition & mutex
+        pthread_mutex_init(&mutex, NULL);
+        pthread_cond_init(&cond, NULL);
+		
+		// wait to exit tracking thread
+		pthread_mutex_lock(&mutex);
+		while (!signalled) {
+			pthread_mutex_lock(&mutex);
+			pthread_cond_wait(&cond, &mtx);
+			pthread_mutex_unlock(&mutex);
+		} signalled = false;
+		std::cout << "tracking thread has exited" << std::endl;
+
+		// exit tracking thread
+		pthread_exit(&trackThread);
+
+		// wait to exit tracking thread
+		while (!signalled) {
+			pthread_mutex_lock(&mutex);
+			pthread_cond_wait(&cond, &mtx);
+			pthread_mutex_unlock(&mutex);
+		} signalled = false;
+		std::cout << "listening thread has exited" << std::endl;
+		
+		// exit tracking thread
+		pthread_exit(&listenThread);
+		
 		return 1;
 	}
 	else {
@@ -480,12 +578,15 @@ float* q = new float[4];
 
 float* GetQuaternion()
 {
-	mtx.lock();
+	pthread_mutex_lock(&mtx);
 	q[0] = qt.array[0];
 	q[1] = qt.array[1];
 	q[2] = qt.array[2];
 	q[3] = qt.array[3];
-	mtx.unlock();
+	pthread_mutex_unlock(&mtx);
+
+	// signal
+	signalled = true;
 	return q;
 }
 
@@ -494,11 +595,13 @@ float* e = new float[3];
 float* GetEuler()
 {
 
-	mtx.lock();
+	pthread_mutex_lock(&mtx);
 	e[0] = euler.angle.pitch;
 	e[1] = euler.angle.roll;
 	e[2] = euler.angle.yaw;
-	mtx.unlock();
+	pthread_mutex_unlock(&mtx);
+	// signal
+	signalled = true;
 	return e;
 }
 
@@ -506,9 +609,11 @@ float* GetEuler()
 int GetBrightness()
 {
 	int curBrightness;
-	it4.lock();
+	pthread_mutex_lock(&mtx);
 	curBrightness = brightness;
-	it4.unlock();
-
+	pthread_mutex_unlock(&mtx);
+	// signal
+	signalled = true;
+	std::cout << "Brightness called" << std::endl;
 	return curBrightness;
 }

@@ -1,9 +1,24 @@
+// TODO: post-draft pr, remove bg / investigation comments and links
+
+// macOS compatibility
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+
+#ifdef AIRAPI_EXPORTS
+#define AIR_API __attribute__((visibility("default")))
+#else
+#define AIR_API
+#endif
+
+#else
+
 #pragma once
 
 #ifdef AIRAPI_EXPORTS
 #define AIR_API __declspec(dllexport)
 #else
 #define AIR_API __declspec(dllimport)
+#endif
+
 #endif
 
 //Function to start connection to Air
