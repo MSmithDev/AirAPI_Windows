@@ -448,7 +448,7 @@ void *interface4Handler(void *lpParam) {
 				break;
 
 			default:
-				std::cout << "Brightness: default inner switch case" << std::endl;
+				// std::cout << "Brightness: default inner switch case" << std::endl;
 				break;
 			}
 		} else {
