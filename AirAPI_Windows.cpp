@@ -395,6 +395,7 @@ void *track(void *lpParam) {
 // DWORD is typealias of: unsigned int
 // 
 // must be format: void *worker_thread(void *arg)
+int brightness = 0;
 void *interface4Handler(void *lpParam) {
 	std::cout << "interface4Handler invoked" << std::endl;
 
@@ -606,8 +607,6 @@ float* GetEuler()
 	signalled = true;
 	return e;
 }
-
-int brightness = 0;
 
 int GetBrightness()
 {
