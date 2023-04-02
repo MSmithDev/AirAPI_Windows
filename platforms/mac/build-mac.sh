@@ -15,7 +15,7 @@ mkdir -p $BUILD_MAC_LIB_DIR
 mkdir -p $BUILD_MAC_INCLUDE_DIR
 
 # copy
-cp "$PROJ_ROOT_DIR/AirAPI_Windows.h" "$BUILD_MAC_INCLUDE_DIR/AirAPI_Mac.h" &&
+cp "$PROJ_ROOT_DIR/platforms/mac/AirAPI_Mac.h" "$BUILD_MAC_INCLUDE_DIR/AirAPI_Mac.h" &&
 
 # run cmake build to release
 cmake -B $BUILD_MAC_DIR -DCMAKE_BUILD_TYPE=Release && cmake --build $BUILD_MAC_DIR

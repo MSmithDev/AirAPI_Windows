@@ -401,8 +401,7 @@ void interface4Handler(LPVOID lpParam) {
 
 	//get initial brightness from device
 	std::array<uint8_t, 17> initBrightness = { 0x00, 0xfd, 0x1e, 0xb9, 0xf0, 0x68, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03 };
-	hid_write(device4, initBrightness.data(), initBrightness.size());
-	
+	hid_write(device4, initBrightness.data(), initBrightness.size());	
 
 	while (g_isListening) {
 		std::array<uint8_t, 65> recv = {};
@@ -464,6 +463,9 @@ int StartConnection()
 		return 1;
 	}
 	else {
+		//
+		// ** Init Device Connection **//
+		//
 		std::cout << "Opening Device" << std::endl;
 		// open device
 		device = open_device();
@@ -473,10 +475,19 @@ int StartConnection()
 			return 1;
 		}
 
+		//
+		// ** Start Device Communication **//
+		//
 		std::cout << "Sending Payload" << std::endl;
 		// open the floodgates
 		uint8_t magic_payload[] = { 0x00, 0xaa, 0xc5, 0xd1, 0x21, 0x42, 0x04, 0x00, 0x19, 0x01 };
+		const size_t payloadArrSize = sizeof(magic_payload) / sizeof(magic_payload[0]);
 
+		std::cout << "Array values: ";
+		for (size_t i = 0; i < payloadArrSize; i++) {
+			std::cout << static_cast<int>(magic_payload[i]) << " ";
+		}
+		std::cout << std::endl;
 
 		int res = hid_write(device, magic_payload, sizeof(magic_payload));
 		if (res < 0) {
@@ -484,36 +495,39 @@ int StartConnection()
 			return 1;
 		}
 		std::cout << res << std::endl;
-
+		
+		//
+		// ** Tracking Thread Creation **//
+		//
 		ThreadParams *trackParamsPtr;
 		trackParamsPtr = (ThreadParams *) malloc(sizeof(ThreadParams));
 		trackParamsPtr->device = { device };
-		
 		g_isTracking = true;
-		std::cout << "Tracking Starting Thread" << std::endl;
+		std::cout << "Starting tracking thread" << std::endl;
 		// thread creation
 		pthread_create(&trackThread, NULL, &track, trackParamsPtr);
 		
 		if (trackThread == NULL) {
-			std::cout << "Failed to create tracking thread" << std::endl;
+			std::cout << "Failed to start tracking thread" << std::endl;
 			return 1;
 		}
-		std::cout << "Tracking Thread Started" << std::endl;
+		std::cout << "Starting tracking thread" << std::endl;
 
+		//
+		// ** Listening Thread Creation **//
+		//
 		ThreadParams *listenParamsPtr;
 		listenParamsPtr = (ThreadParams *) malloc(sizeof(ThreadParams));
 		listenParamsPtr->device = { };
-
 		g_isListening = true;
-		std::cout << "Listening Starting Thread" << std::endl;
-
+		std::cout << "Starting listening thread" << std::endl;
 		// thread creation
 		pthread_create(&listenThread, NULL, &track, listenParamsPtr);
 		if (listenThread == NULL) {
 			std::cout << "Failed to create listening thread" << std::endl;
 			return 1;
 		}
-		std::cout << "Listener Thread Started" << std::endl;
+		std::cout << "Listening thread started" << std::endl;
 		return 1;
 	}
 }

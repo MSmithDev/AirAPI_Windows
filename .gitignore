@@ -413,3 +413,5 @@ build/
 # mac stuff
 *.DS_Store
 
+# local stuf
+local-data/
