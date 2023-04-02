@@ -334,7 +334,6 @@ void *track(void *lpParam) {
 	};
 	FusionAhrsSetSettings(&ahrs, &settings);
 
-
 	while (g_isTracking) {
 		try {
 			// code that might throw an exception
@@ -388,7 +387,7 @@ void *track(void *lpParam) {
 	}
 	return 0;
 }
-int brightness = 0;
+
 // needs to conform to void *_Nullable (*_Nonnull)(void *)
 // LPVOID is alias of: void *
 // aka pointer to any type
@@ -396,7 +395,7 @@ int brightness = 0;
 // DWORD is typealias of: unsigned int
 // 
 // must be format: void *worker_thread(void *arg)
-void interface4Handler(LPVOID lpParam) {
+void *interface4Handler(void *lpParam) {
 	std::cout << "interface4Handler invoked" << std::endl;
 
 	//get initial brightness from device
@@ -414,7 +413,7 @@ void interface4Handler(LPVOID lpParam) {
 				brightness = recv[30];
 				pthread_mutex_unlock(&it4);
 				
-				std::cout << "Brightness: down pressed" << std::endl;
+				std::cout << "brightness: down detected, value:" << (int)brightness << std::endl;
 				// signal
 				signalled = true;
 				break;
@@ -423,14 +422,14 @@ void interface4Handler(LPVOID lpParam) {
 				pthread_mutex_lock(&it4);
 				brightness = recv[30];
 				pthread_mutex_unlock(&it4);
-				
-				std::cout << "Brightness: up pressed" << std::endl;
+
+				std::cout << "brightness: up detected, value:" << (int)brightness << std::endl;
 				// signal
 				signalled = true;
 				break;
 
 			default:
-				std::cout << "Brightness: Unknown Packet! " << (int)recv[22] << std::endl;
+				// std::cout << "Brightness: Unknown Packet! " << (int)recv[22] << std::endl;
 				break;
 
 			}
@@ -451,6 +450,8 @@ void interface4Handler(LPVOID lpParam) {
 				std::cout << "Brightness: default inner switch case" << std::endl;
 				break;
 			}
+		} else {
+			std::cout << "Brightness: connection failed due to non-response" << std::endl;
 		}
 	}
 
@@ -483,7 +484,7 @@ int StartConnection()
 		uint8_t magic_payload[] = { 0x00, 0xaa, 0xc5, 0xd1, 0x21, 0x42, 0x04, 0x00, 0x19, 0x01 };
 		const size_t payloadArrSize = sizeof(magic_payload) / sizeof(magic_payload[0]);
 
-		std::cout << "Array values: ";
+		std::cout << "magic payload: ";
 		for (size_t i = 0; i < payloadArrSize; i++) {
 			std::cout << static_cast<int>(magic_payload[i]) << " ";
 		}
@@ -522,7 +523,7 @@ int StartConnection()
 		g_isListening = true;
 		std::cout << "Starting listening thread" << std::endl;
 		// thread creation
-		pthread_create(&listenThread, NULL, &track, listenParamsPtr);
+		pthread_create(&listenThread, NULL, &interface4Handler, listenParamsPtr);
 		if (listenThread == NULL) {
 			std::cout << "Failed to create listening thread" << std::endl;
 			return 1;
@@ -532,19 +533,6 @@ int StartConnection()
 	}
 }
 
-
-// FOR REVIEW:
-// I have implemented pthread to 
-// deal with thread management since this is
-// not windows.. problem is, this is the bounds
-// of what I know at the moment and need a little 
-// help successfully / properly closing these threads.
-// 
-// Please review my implementation of pthread and lmk
-// what needs changing, the processes seem to exit,
-// but produce a crash when working with the library
-// in swift (via Objective-C, will share the macOS project
-// for that next.
 int StopConnection()
 {
 	if (g_isTracking) {
@@ -619,6 +607,7 @@ float* GetEuler()
 	return e;
 }
 
+int brightness = 0;
 
 int GetBrightness()
 {
@@ -628,6 +617,5 @@ int GetBrightness()
 	pthread_mutex_unlock(&mtx);
 	// signal
 	signalled = true;
-	std::cout << "Brightness called" << std::endl;
 	return curBrightness;
 }
