@@ -7,6 +7,9 @@ https://github.com/abls <br>
 https://github.com/edwatt <br>
 https://github.com/jakedowns
 
+Feel free to support me with a coffee.
+https://www.buymeacoffee.com/msmithdev
+
 ## Precompiled
 To use the precompiled [AirAPI_Windows.dll](https://github.com/MSmithDev/AirAPI_Windows/releases) you also need to include hidapi.dll available [here](https://github.com/libusb/hidapi/releases). 
 
