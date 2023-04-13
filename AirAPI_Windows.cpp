@@ -267,6 +267,9 @@ open_device4()
 struct ThreadParams {
 	hid_device* device;
 };
+static float ang_vel[3] = {};
+static float accel_vec[3] = {};
+static float mag_vec[3] = {};
 
 DWORD WINAPI track(LPVOID lpParam) {
 
@@ -276,8 +279,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 	air_sample sample = {};
 	ThreadParams* params = static_cast<ThreadParams*>(lpParam);
 	//static FusionVector ang_vel = {}, accel_vec = {};
-	static float ang_vel[3] = {};
-	static float accel_vec[3] = {};
+	
 
 
 	// Define calibration (replace with actual calibration data if available)
@@ -401,6 +403,7 @@ DWORD WINAPI interface4Handler(LPVOID lpParam) {
 			}
 		}
 	}
+	return 0;
 }
 
 
@@ -559,4 +562,23 @@ int GetFusionState() {
 	// error counter?
 
 	return 0;
+}
+
+float* rawGyro = new float[3];
+
+float* GetRawGyro() {
+
+	mtx.lock();
+	rawGyro = ang_vel;
+	mtx.unlock();
+	return rawGyro;
+}
+
+float* rawAccel = new float[3];
+float* GetRawAccel() {
+
+	mtx.lock();
+	rawAccel = accel_vec;
+	mtx.unlock();
+	return rawAccel;
 }

@@ -18,6 +18,12 @@ extern "C" AIR_API float* GetQuaternion();
 //Function to get euler
 extern "C" AIR_API float* GetEuler();
 
+//Function to get euler
+extern "C" AIR_API float* GetRawGyro();
+
+//Function to get euler
+extern "C" AIR_API float* GetRawAccel();
+
 //Function to get brightness
 extern "C" AIR_API int GetBrightness();
 
