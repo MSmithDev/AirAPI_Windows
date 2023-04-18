@@ -207,8 +207,8 @@ process_ang_vel(const int32_t in_ang_vel[3], float out_vec[])
 
 	// these scale and bias corrections are all rough guesses
 	out_vec[0] = (float)(in_ang_vel[0]) * -1.0f * GYRO_SCALAR;
-	out_vec[1] = (float)(in_ang_vel[2]) * GYRO_SCALAR;
-	out_vec[2] = (float)(in_ang_vel[1]) * GYRO_SCALAR;
+	out_vec[1] = (float)(in_ang_vel[1]) * GYRO_SCALAR;
+	out_vec[2] = (float)(in_ang_vel[2]) * GYRO_SCALAR;
 }
 
 static void
@@ -216,8 +216,8 @@ process_accel(const int32_t in_accel[3], float out_vec[])
 {
 	// these scale and bias corrections are all rough guesses
 	out_vec[0] = (float)(in_accel[0]) * ACCEL_SCALAR;
-	out_vec[1] = (float)(in_accel[2]) * ACCEL_SCALAR;
-	out_vec[2] = (float)(in_accel[1]) * ACCEL_SCALAR;
+	out_vec[1] = (float)(in_accel[1]) * ACCEL_SCALAR;
+	out_vec[2] = (float)(in_accel[2]) * ACCEL_SCALAR;
 
 }
 
