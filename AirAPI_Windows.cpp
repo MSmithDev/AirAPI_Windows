@@ -92,7 +92,7 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 
 
 	const uint64_t timestamp = packet->timestamp;
-	std::cout << "TS: " << timestamp << std::endl;
+	//std::cout << "TS: " << timestamp << std::endl;
 	out_sample->tick = timestamp;
 
 	int32_t vel_m = pack16bit_signed(packet->angular_multiplier);
