@@ -57,148 +57,81 @@ typedef struct {
 	uint64_t tick;
 	int32_t ang_vel[3];
 	int32_t accel[3];
+	int16_t mag[3];
 } air_sample;
 
 
-static int
-parse_report(const unsigned char* buffer_in, int size, air_sample* out_sample)
-{
-	if (size != 64) {
-		printf("Invalid packet size");
-		return -1;
-	}
-	// clock in nanoseconds
-	buffer_in += 4;
-	out_sample->tick = ((uint64_t) * (buffer_in++));
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 8);
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 16);
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 24);
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 32);
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 40);
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 48);
-	out_sample->tick = out_sample->tick | (((uint64_t) * (buffer_in++)) << 56);
-
-	uint32_t t0v, t1v, t2v, t3v, t0a, t1a, t2a, t3a;
-	// gyroscope measurements	
-	buffer_in += 6;
-	if (*(buffer_in + 2) & 0x80) {
-		t0v = (0xff << 24);
-		t3v = *(buffer_in++);
-		t1v = (*(buffer_in++) << 8);
-		t2v = (*(buffer_in++) << 16);
-
-		out_sample->ang_vel[0] = t0v | t1v | t2v | t3v;
-		// out_sample->ang_vel[0] = (0xff << 24) | *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-	else {
-		t0v = (0x00 << 24);
-		t3v = *(buffer_in++);
-		t1v = (*(buffer_in++) << 8);
-		t2v = (*(buffer_in++) << 16);
-
-		out_sample->ang_vel[0] = t0v | t1v | t2v | t3v;
-		// out_sample->ang_vel[0] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-
-	if (*(buffer_in + 2) & 0x80) {
-		t0v = (0xff << 24);
-		t3v = *(buffer_in++);
-		t1v = (*(buffer_in++) << 8);
-		t2v = (*(buffer_in++) << 16);
-
-		out_sample->ang_vel[1] = t0v | t1v | t2v | t3v;
-		// out_sample->ang_vel[1] = (0xff << 24) | *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-	else {
-		t0v = (0x00 << 24);
-		t3v = *(buffer_in++);
-		t1v = (*(buffer_in++) << 8);
-		t2v = (*(buffer_in++) << 16);
-
-		out_sample->ang_vel[1] = t0v | t1v | t2v | t3v;
-		// out_sample->ang_vel[1] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-
-	if (*(buffer_in + 2) & 0x80) {
-		t0v = (0xff << 24);
-		t3v = *(buffer_in++);
-		t1v = (*(buffer_in++) << 8);
-		t2v = (*(buffer_in++) << 16);
-
-		out_sample->ang_vel[2] = t0v | t1v | t2v | t3v;
-		// out_sample->ang_vel[2] = (0xff << 24) | *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-	else {
-		t0v = (0x00 << 24);
-		t3v = *(buffer_in++);
-		t1v = (*(buffer_in++) << 8);
-		t2v = (*(buffer_in++) << 16);
-
-		out_sample->ang_vel[2] = t0v | t1v | t2v | t3v;
-		// out_sample->ang_vel[2] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-
-	// accelerometer data
-	buffer_in += 6;
-	if (*(buffer_in + 2) & 0x80) {
-		t0a = (0xff << 24);
-		t3a = *(buffer_in++);
-		t1a = (*(buffer_in++) << 8);
-		t2a = (*(buffer_in++) << 16);
-
-		out_sample->accel[0] = t0a | t1a | t2a | t3a;
-		// out_sample->accel[0] = (0xff << 24) | *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-	else {
-		t0a = (0x00 << 24);
-		t3a = *(buffer_in++);
-		t1a = (*(buffer_in++) << 8);
-		t2a = (*(buffer_in++) << 16);
-
-		out_sample->accel[0] = t0a | t1a | t2a | t3a;
-		// out_sample->accel[0] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-
-	if (*(buffer_in + 2) & 0x80) {
-		t0a = (0xff << 24);
-		t3a = *(buffer_in++);
-		t1a = (*(buffer_in++) << 8);
-		t2a = (*(buffer_in++) << 16);
-
-		out_sample->accel[1] = t0a | t1a | t2a | t3a;
-		// out_sample->accel[1] = (0xff << 24) | *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-	else {
-		t0a = (0x00 << 24);
-		t3a = *(buffer_in++);
-		t1a = (*(buffer_in++) << 8);
-		t2a = (*(buffer_in++) << 16);
-
-		out_sample->accel[1] = t0a | t1a | t2a | t3a;
-		// out_sample->accel[1] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-
-	if (*(buffer_in + 2) & 0x80) {
-		t0a = (0xff << 24);
-		t3a = *(buffer_in++);
-		t1a = (*(buffer_in++) << 8);
-		t2a = (*(buffer_in++) << 16);
-
-		out_sample->accel[2] = t0a | t1a | t2a | t3a;
-		// out_sample->accel[2] = (0xff << 24) | *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-	else {
-		t0a = (0x00 << 24);
-		t3a = *(buffer_in++);
-		t1a = (*(buffer_in++) << 8);
-		t2a = (*(buffer_in++) << 16);
-
-		out_sample->accel[2] = t0a | t1a | t2a | t3a;
-		// out_sample->accel[2] = *(buffer_in++) | (*(buffer_in++) << 8) | (*(buffer_in++) << 16);
-	}
-
-	return 0;
+static int32_t pack32bit_signed(const uint8_t* data) {
+	uint32_t unsigned_value = (data[0]) | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+	return ((int32_t)unsigned_value);
 }
+
+static int32_t pack24bit_signed(const uint8_t* data) {
+	uint32_t unsigned_value = (data[0]) | (data[1] << 8) | (data[2] << 16);
+	if ((data[2] & 0x80) != 0) unsigned_value |= (0xFF << 24);
+	return ((int32_t)unsigned_value);
+}
+
+static int16_t pack16bit_signed(const uint8_t* data) {
+	uint16_t unsigned_value = (data[0]) | (data[1] << 8);
+	return (int16_t)unsigned_value;
+}
+
+static int32_t pack32bit_signed_swap(const uint8_t* data) {
+	uint32_t unsigned_value = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | (data[3]);
+	return ((int32_t)unsigned_value);
+}
+
+static int16_t pack16bit_signed_swap(const uint8_t* data) {
+	uint16_t unsigned_value = (data[0] << 8) | (data[1]);
+	return (int16_t)unsigned_value;
+}
+
+
+static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample) {
+
+
+	const uint64_t timestamp = packet->timestamp;
+	std::cout << "TS: " << timestamp << std::endl;
+	out_sample->tick = timestamp;
+
+	int32_t vel_m = pack16bit_signed(packet->angular_multiplier);
+	int32_t vel_d = pack32bit_signed(packet->angular_divisor);
+
+	int32_t vel_x = pack24bit_signed(packet->angular_velocity_x);
+	int32_t vel_y = pack24bit_signed(packet->angular_velocity_y);
+	int32_t vel_z = pack24bit_signed(packet->angular_velocity_z);
+
+	out_sample->ang_vel[0] = (float)vel_x * vel_m / vel_d;
+	out_sample->ang_vel[1] = (float)vel_y * vel_m / vel_d;
+	out_sample->ang_vel[2] = (float)vel_z * vel_m / vel_d;
+
+	int32_t accel_m = pack16bit_signed(packet->acceleration_multiplier);
+	int32_t accel_d = pack32bit_signed(packet->acceleration_divisor);
+
+	int32_t accel_x = pack24bit_signed(packet->acceleration_x);
+	int32_t accel_y = pack24bit_signed(packet->acceleration_y);
+	int32_t accel_z = pack24bit_signed(packet->acceleration_z);
+
+	out_sample->accel[0] = (float)accel_x * accel_m / accel_d;
+	out_sample->accel[1] = (float)accel_y * accel_m / accel_d;
+	out_sample->accel[2] = (float)accel_z * accel_m / accel_d;
+
+	int32_t magnet_m = pack16bit_signed_swap(packet->magnetic_multiplier);
+	int32_t magnet_d = pack32bit_signed_swap(packet->magnetic_divisor);
+
+	int16_t magnet_x = pack16bit_signed_swap(packet->magnetic_x);
+	int16_t magnet_y = pack16bit_signed_swap(packet->magnetic_y);
+	int16_t magnet_z = pack16bit_signed_swap(packet->magnetic_z);
+
+	out_sample->mag[0] = (float)magnet_x * magnet_m / magnet_d;
+	out_sample->mag[1] = (float)magnet_y * magnet_m / magnet_d;
+	out_sample->mag[2] = (float)magnet_z * magnet_m / magnet_d;
+
+
+	return 1;
+}
+
 
 
 static void
@@ -270,16 +203,22 @@ struct ThreadParams {
 static float ang_vel[3] = {};
 static float accel_vec[3] = {};
 static float mag_vec[3] = {};
+static uint64_t airTimestamp;
+
+
 
 DWORD WINAPI track(LPVOID lpParam) {
 
 	//Thread to handle tracking
-	unsigned char buffer[64] = {};
+	//unsigned char buffer[64] = {};
+	AirDataPacket buffer;
+	memset(&buffer, 0, sizeof(AirDataPacket));
+
 	uint64_t last_sample_tick = 0;
 	air_sample sample = {};
 	ThreadParams* params = static_cast<ThreadParams*>(lpParam);
 	//static FusionVector ang_vel = {}, accel_vec = {};
-	
+
 
 
 	// Define calibration (replace with actual calibration data if available)
@@ -309,7 +248,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 		try {
 			// code that might throw an exception
-			int res = hid_read(device, buffer, sizeof(buffer));
+			int res = hid_read(device, (uint8_t*)&buffer, sizeof(buffer));
 			if (res < 0) {
 				break;
 			}
@@ -321,16 +260,19 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 
 		//parse
-		parse_report(buffer, sizeof(buffer), &sample);
+		parse_report(&buffer, sizeof(buffer), &sample);
 
-		//process sample
-		process_ang_vel(sample.ang_vel, ang_vel);
-		process_accel(sample.accel, accel_vec);
-
+		
 		// Acquire latest sensor data
-		const uint64_t timestamp = sample.tick; // replace this with actual gyroscope timestamp
-		FusionVector gyroscope = { ang_vel[0], ang_vel[1], ang_vel[2] }; // replace this with actual gyroscope data in degrees/s
-		FusionVector accelerometer = { accel_vec[0], accel_vec[1], accel_vec[2] }; // replace this with actual accelerometer data in g
+		//const uint64_t timestamp = sample.tick; // replace this with actual gyroscope timestamp
+		FusionVector gyroscope = { sample.ang_vel[0], sample.ang_vel[1], sample.ang_vel[2] };
+		
+		FusionVector accelerometer = { sample.accel[0], sample.accel[1], sample.accel[2] };
+
+		airTimestamp = sample.tick;
+
+		//FusionVector gyroscope = { ang_vel[0], ang_vel[1], ang_vel[2] }; // replace this with actual gyroscope data in degrees/s
+		//FusionVector accelerometer = { accel_vec[0], accel_vec[1], accel_vec[2] }; // replace this with actual accelerometer data in g
 
 		// Apply calibration
 		gyroscope = FusionCalibrationInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
@@ -341,8 +283,8 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 		// Calculate delta time (in seconds) to account for gyroscope sample clock error
 		static uint64_t previousTimestamp;
-		const float deltaTime = (float)(timestamp - previousTimestamp) / (float)1e9;
-		previousTimestamp = timestamp;
+		const float deltaTime = (float)(airTimestamp - previousTimestamp) / (float)1e9;
+		previousTimestamp = airTimestamp;
 
 		// Update gyroscope AHRS algorithm
 		mtx.lock();
@@ -358,6 +300,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 	}
 	return 0;
+
 }
 int brightness = 0;
 DWORD WINAPI interface4Handler(LPVOID lpParam) {
@@ -581,4 +524,21 @@ float* GetRawAccel() {
 	rawAccel = accel_vec;
 	mtx.unlock();
 	return rawAccel;
+}
+
+float* rawMag = new float[3];
+float* GetRawMag() {
+
+	mtx.lock();
+	rawMag = mag_vec;
+	mtx.unlock();
+	return rawMag;
+}
+
+
+unsigned long long GetAirTimestamp() {
+	mtx.lock();
+	unsigned long long ts = airTimestamp;
+	mtx.unlock();
+	return ts;
 }

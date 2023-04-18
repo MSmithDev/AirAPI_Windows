@@ -18,11 +18,17 @@ extern "C" AIR_API float* GetQuaternion();
 //Function to get euler
 extern "C" AIR_API float* GetEuler();
 
-//Function to get euler
+//Function to get rawGyro
 extern "C" AIR_API float* GetRawGyro();
 
-//Function to get euler
+//Function to get rawAccel
 extern "C" AIR_API float* GetRawAccel();
+
+//Function to get rawMag
+extern "C" AIR_API float* GetRawMag();
+
+//funtion to get timestamp
+extern "C" AIR_API unsigned long long GetAirTimestamp();
 
 //Function to get brightness
 extern "C" AIR_API int GetBrightness();
@@ -38,3 +44,30 @@ extern "C" AIR_API int SetFusionMagRejection(float);
 
 //Function to set mag rejection 
 extern "C" AIR_API int SetFusionRejectTimeout(unsigned int);
+
+
+#include <cstdint>
+#pragma pack(push, 1)
+struct AirDataPacket {
+	uint8_t signature[2];
+	uint8_t temperature[2];
+	uint64_t timestamp;
+	uint8_t angular_multiplier[2];
+	uint8_t angular_divisor[4];
+	uint8_t angular_velocity_x[3];
+	uint8_t angular_velocity_y[3];
+	uint8_t angular_velocity_z[3];
+	uint8_t acceleration_multiplier[2];
+	uint8_t acceleration_divisor[4];
+	uint8_t acceleration_x[3];
+	uint8_t acceleration_y[3];
+	uint8_t acceleration_z[3];
+	uint8_t magnetic_multiplier[2];
+	uint8_t magnetic_divisor[4];
+	uint8_t magnetic_x[2];
+	uint8_t magnetic_y[2];
+	uint8_t magnetic_z[2];
+	uint32_t checksum;
+	uint8_t _padding[6];
+};
+#pragma pack(pop)
