@@ -49,6 +49,7 @@ extern "C" AIR_API int SetFusionRejectTimeout(unsigned int);
 #include <cstdint>
 #pragma pack(push, 1)
 struct AirDataPacket {
+	uint8_t reportid[1];
 	uint8_t signature[2];
 	uint8_t temperature[2];
 	uint64_t timestamp;
