@@ -6,6 +6,8 @@
 #define AIR_API __declspec(dllimport)
 #endif
 
+#include <cstdint>
+
 //Function to start connection to Air
 extern "C" AIR_API int StartConnection();
 
@@ -28,7 +30,7 @@ extern "C" AIR_API float* GetRawAccel();
 extern "C" AIR_API float* GetRawMag();
 
 //funtion to get timestamp
-extern "C" AIR_API unsigned long long GetAirTimestamp();
+extern "C" AIR_API uint64_t GetAirTimestamp();
 
 //Function to get brightness
 extern "C" AIR_API int GetBrightness();
@@ -46,10 +48,10 @@ extern "C" AIR_API int SetFusionMagRejection(float);
 extern "C" AIR_API int SetFusionRejectTimeout(unsigned int);
 
 
-#include <cstdint>
+
 #pragma pack(push, 1)
 struct AirDataPacket {
-	uint8_t reportid[1];
+	
 	uint8_t signature[2];
 	uint8_t temperature[2];
 	uint64_t timestamp;

@@ -62,31 +62,66 @@ typedef struct {
 
 
 static int32_t pack32bit_signed(const uint8_t* data) {
-	uint32_t unsigned_value = (data[0]) | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+	uint32_t t0v, t1v, t2v, t3v;
+	t0v = data[0];
+	t1v = (data[1] << 8);
+	t2v = (data[2] << 16);
+	t3v = (data[3] << 24);
+
+	uint32_t unsigned_value = t0v | t1v | t2v | t3v;
 	return ((int32_t)unsigned_value);
 }
 
 static int32_t pack24bit_signed(const uint8_t* data) {
-	uint32_t unsigned_value = (data[0]) | (data[1] << 8) | (data[2] << 16);
-	if ((data[2] & 0x80) != 0) unsigned_value |= (0xFF << 24);
+	uint32_t t0v, t1v, t2v, t3v, unsigned_value;
+	t0v = data[0];
+	t1v = (data[1] << 8);
+	t2v = (data[2] << 16);
+	
+	if ((data[2] & 0x80) != 0) {
+		t3v = (0xFF << 24);
+		unsigned_value = t3v|t0v | t1v | t2v;
+	}
+	else
+	{
+		t3v = (0x00 << 24);
+		unsigned_value = t0v | t1v | t2v;
+	}
+	
 	return ((int32_t)unsigned_value);
 }
 
 static int16_t pack16bit_signed(const uint8_t* data) {
-	uint16_t unsigned_value = (data[0]) | (data[1] << 8);
+	uint32_t t0v, t1v;
+	t0v = data[0];
+	t1v = (data[1] << 8);
+
+	uint16_t unsigned_value = t0v | t1v;
 	return (int16_t)unsigned_value;
 }
 
 static int32_t pack32bit_signed_swap(const uint8_t* data) {
-	uint32_t unsigned_value = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | (data[3]);
+	uint32_t t0v, t1v, t2v, t3v;
+	t0v = data[0] << 24;
+	t1v = (data[1] << 16);
+	t2v = (data[2] << 8);
+	t3v = (data[3]);
+
+	uint32_t unsigned_value = t0v | t1v | t2v | t3v;
 	return ((int32_t)unsigned_value);
 }
 
 static int16_t pack16bit_signed_swap(const uint8_t* data) {
-	uint16_t unsigned_value = (data[0] << 8) | (data[1]);
+	uint32_t t0v, t1v;
+	t0v = data[0] << 8;
+	t1v = (data[1]);
+	uint16_t unsigned_value = t0v | t1v;
 	return (int16_t)unsigned_value;
 }
 
+static float ang_vel[3] = {};
+static float accel_vec[3] = {};
+static float mag_vec[3] = {};
 
 static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample) {
 
@@ -105,6 +140,16 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 	out_sample->ang_vel[0] = (float)vel_x * vel_m / vel_d;
 	out_sample->ang_vel[1] = (float)vel_y * vel_m / vel_d;
 	out_sample->ang_vel[2] = (float)vel_z * vel_m / vel_d;
+
+	ang_vel[0] = out_sample->ang_vel[0];
+	ang_vel[1] = out_sample->ang_vel[1];
+	ang_vel[2] = out_sample->ang_vel[2];
+
+	accel_vec[0] = out_sample->accel[0];
+	accel_vec[1] = out_sample->accel[1];
+	accel_vec[2] = out_sample->accel[2];
+
+
 
 	int32_t accel_m = pack16bit_signed(packet->acceleration_multiplier);
 	int32_t accel_d = pack32bit_signed(packet->acceleration_divisor);
@@ -130,28 +175,6 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 
 
 	return 1;
-}
-
-
-
-static void
-process_ang_vel(const int32_t in_ang_vel[3], float out_vec[])
-{
-
-	// these scale and bias corrections are all rough guesses
-	out_vec[0] = (float)(in_ang_vel[0]) * -1.0f * GYRO_SCALAR;
-	out_vec[1] = (float)(in_ang_vel[1]) * GYRO_SCALAR;
-	out_vec[2] = (float)(in_ang_vel[2]) * GYRO_SCALAR;
-}
-
-static void
-process_accel(const int32_t in_accel[3], float out_vec[])
-{
-	// these scale and bias corrections are all rough guesses
-	out_vec[0] = (float)(in_accel[0]) * ACCEL_SCALAR;
-	out_vec[1] = (float)(in_accel[1]) * ACCEL_SCALAR;
-	out_vec[2] = (float)(in_accel[2]) * ACCEL_SCALAR;
-
 }
 
 
@@ -200,9 +223,7 @@ open_device4()
 struct ThreadParams {
 	hid_device* device;
 };
-static float ang_vel[3] = {};
-static float accel_vec[3] = {};
-static float mag_vec[3] = {};
+
 static uint64_t airTimestamp;
 
 
@@ -536,9 +557,9 @@ float* GetRawMag() {
 }
 
 
-unsigned long long GetAirTimestamp() {
+uint64_t GetAirTimestamp() {
 	mtx.lock();
-	unsigned long long ts = airTimestamp;
+	uint64_t ts = airTimestamp;
 	mtx.unlock();
 	return ts;
 }
