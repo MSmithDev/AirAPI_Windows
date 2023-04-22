@@ -71,6 +71,6 @@ struct AirDataPacket {
 	uint8_t magnetic_y[2];
 	uint8_t magnetic_z[2];
 	uint32_t checksum;
-	uint8_t _padding[6];
+	uint8_t _padding[7];
 };
 #pragma pack(pop)

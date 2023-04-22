@@ -73,22 +73,9 @@ static int32_t pack32bit_signed(const uint8_t* data) {
 }
 
 static int32_t pack24bit_signed(const uint8_t* data) {
-	uint32_t t0v, t1v, t2v, t3v, unsigned_value;
-	t0v = data[0];
-	t1v = (data[1] << 8);
-	t2v = (data[2] << 16);
-	
-	if ((data[2] & 0x80) != 0) {
-		t3v = (0xFF << 24);
-		unsigned_value = t3v|t0v | t1v | t2v;
-	}
-	else
-	{
-		t3v = (0x00 << 24);
-		unsigned_value = t0v | t1v | t2v;
-	}
-	
-	return ((int32_t)unsigned_value);
+	uint32_t unsigned_value = (data[0]) | (data[1] << 8) | (data[2] << 16);
+	if ((data[2] & 0x80) != 0) unsigned_value |= (0xFFu << 24);
+	return static_cast<int32_t>(unsigned_value);
 }
 
 static int16_t pack16bit_signed(const uint8_t* data) {
@@ -97,7 +84,7 @@ static int16_t pack16bit_signed(const uint8_t* data) {
 	t1v = (data[1] << 8);
 
 	uint16_t unsigned_value = t0v | t1v;
-	return (int16_t)unsigned_value;
+	return static_cast<int16_t>(unsigned_value);
 }
 
 static int32_t pack32bit_signed_swap(const uint8_t* data) {
@@ -108,8 +95,9 @@ static int32_t pack32bit_signed_swap(const uint8_t* data) {
 	t3v = (data[3]);
 
 	uint32_t unsigned_value = t0v | t1v | t2v | t3v;
-	return ((int32_t)unsigned_value);
+	return static_cast<int32_t>(unsigned_value);
 }
+
 
 static int16_t pack16bit_signed_swap(const uint8_t* data) {
 	uint32_t t0v, t1v;
@@ -119,48 +107,56 @@ static int16_t pack16bit_signed_swap(const uint8_t* data) {
 	return (int16_t)unsigned_value;
 }
 
+//Global variables for get functions
 static float ang_vel[3] = {};
 static float accel_vec[3] = {};
 static float mag_vec[3] = {};
+static uint64_t airTimestamp;
 
 static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample) {
 
 
 	const uint64_t timestamp = packet->timestamp;
-	//std::cout << "TS: " << timestamp << std::endl;
-	out_sample->tick = timestamp;
 
+	out_sample->tick = timestamp;
+	
+	//Gyro scaling values
 	int32_t vel_m = pack16bit_signed(packet->angular_multiplier);
 	int32_t vel_d = pack32bit_signed(packet->angular_divisor);
-
+	
+	//Gyro conversion to 32bit signed
 	int32_t vel_x = pack24bit_signed(packet->angular_velocity_x);
 	int32_t vel_y = pack24bit_signed(packet->angular_velocity_y);
 	int32_t vel_z = pack24bit_signed(packet->angular_velocity_z);
 
-	out_sample->ang_vel[0] = (float)vel_x * vel_m / vel_d;
-	out_sample->ang_vel[1] = (float)vel_y * vel_m / vel_d;
-	out_sample->ang_vel[2] = (float)vel_z * vel_m / vel_d;
+	//Gyro scale correction
+	float vel_x_cor = (float)vel_z * (float)vel_m / (float)vel_d;
+	float vel_y_cor = (float)vel_x * (float)vel_m / (float)vel_d;
+	float vel_z_cor = (float)vel_y * (float)vel_m / (float)vel_d;
 
-	ang_vel[0] = out_sample->ang_vel[0];
-	ang_vel[1] = out_sample->ang_vel[1];
-	ang_vel[2] = out_sample->ang_vel[2];
+	//Fusion gyro sample
+	out_sample->ang_vel[0] = vel_x_cor;
+	out_sample->ang_vel[1] = vel_y_cor;
+	out_sample->ang_vel[2] = vel_z_cor;
 
-	accel_vec[0] = out_sample->accel[0];
-	accel_vec[1] = out_sample->accel[1];
-	accel_vec[2] = out_sample->accel[2];
-
-
-
+	//Accel scaling values
 	int32_t accel_m = pack16bit_signed(packet->acceleration_multiplier);
 	int32_t accel_d = pack32bit_signed(packet->acceleration_divisor);
 
+	//Accel conversion to 32bit signed int
 	int32_t accel_x = pack24bit_signed(packet->acceleration_x);
 	int32_t accel_y = pack24bit_signed(packet->acceleration_y);
 	int32_t accel_z = pack24bit_signed(packet->acceleration_z);
 
-	out_sample->accel[0] = (float)accel_x * accel_m / accel_d;
-	out_sample->accel[1] = (float)accel_y * accel_m / accel_d;
-	out_sample->accel[2] = (float)accel_z * accel_m / accel_d;
+
+	float accel_x_cor = (float)accel_x * (float)accel_m / (float)accel_d;
+	float accel_y_cor = (float)accel_y * (float)accel_m / (float)accel_d;
+	float accel_z_cor = (float)accel_z * (float)accel_m / (float)accel_d;
+
+	//Fusion Accel Sample
+	out_sample->accel[0] = accel_x_cor;
+	out_sample->accel[1] = accel_y_cor;
+	out_sample->accel[2] = accel_z_cor;
 
 	int32_t magnet_m = pack16bit_signed_swap(packet->magnetic_multiplier);
 	int32_t magnet_d = pack32bit_signed_swap(packet->magnetic_divisor);
@@ -169,9 +165,33 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 	int16_t magnet_y = pack16bit_signed_swap(packet->magnetic_y);
 	int16_t magnet_z = pack16bit_signed_swap(packet->magnetic_z);
 
-	out_sample->mag[0] = (float)magnet_x * magnet_m / magnet_d;
-	out_sample->mag[1] = (float)magnet_y * magnet_m / magnet_d;
-	out_sample->mag[2] = (float)magnet_z * magnet_m / magnet_d;
+	float mag_x_cor = (float)magnet_x * (float)magnet_m / (float)magnet_d;
+	float mag_y_cor = (float)magnet_y * (float)magnet_m / (float)magnet_d;
+	float mag_z_cor = (float)magnet_z * (float)magnet_m / (float)magnet_d;
+
+	//Fusion Mag Sample
+	out_sample->mag[0] = mag_x_cor;
+	out_sample->mag[1] = mag_y_cor;
+	out_sample->mag[2] = mag_z_cor;
+
+
+	//lock and update the global variables
+	mtx.lock();
+	
+	airTimestamp = timestamp;
+
+	ang_vel[0] = vel_x_cor;
+	ang_vel[1] = vel_y_cor;
+	ang_vel[2] = vel_z_cor;
+
+	accel_vec[0] = accel_x_cor;
+	accel_vec[1] = accel_y_cor;
+	accel_vec[2] = accel_z_cor;
+
+	mag_vec[0] = mag_x_cor;
+	mag_vec[1] = mag_y_cor;
+	mag_vec[2] = mag_z_cor;
+	mtx.unlock();
 
 
 	return 1;
@@ -224,7 +244,7 @@ struct ThreadParams {
 	hid_device* device;
 };
 
-static uint64_t airTimestamp;
+
 
 
 
@@ -290,7 +310,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 		
 		FusionVector accelerometer = { sample.accel[0], sample.accel[1], sample.accel[2] };
 
-		airTimestamp = sample.tick;
+		
 
 		//FusionVector gyroscope = { ang_vel[0], ang_vel[1], ang_vel[2] }; // replace this with actual gyroscope data in degrees/s
 		//FusionVector accelerometer = { accel_vec[0], accel_vec[1], accel_vec[2] }; // replace this with actual accelerometer data in g
@@ -529,7 +549,6 @@ int GetFusionState() {
 }
 
 float* rawGyro = new float[3];
-
 float* GetRawGyro() {
 
 	mtx.lock();
