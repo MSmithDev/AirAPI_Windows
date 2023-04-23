@@ -20,12 +20,6 @@ bool g_isListening = false;
 // ticks are in nanoseconds, 1000 Hz packets
 #define TICK_LEN (1.0f / 1E9f)
 
-// based on 24bit signed int w/ FSR = +/-2000 dps, datasheet option
-#define GYRO_SCALAR (1.0f / 8388608.0f * 2000.0f)
-
-// based on 24bit signed int w/ FSR = +/-16 g, datasheet option
-#define ACCEL_SCALAR (1.0f / 8388608.0f * 16.0f)
-
 static int rows, cols;
 static FusionEuler euler;
 static FusionVector earth;
@@ -38,7 +32,7 @@ hid_device* device;
 
 hid_device* device4;
 
-#define SAMPLE_RATE (1000) // replace this with actual sample rate
+#define SAMPLE_RATE (1000) // 1000hz
 
 FusionAhrs ahrs;
 
@@ -69,7 +63,7 @@ static int32_t pack32bit_signed(const uint8_t* data) {
 	t3v = (data[3] << 24);
 
 	uint32_t unsigned_value = t0v | t1v | t2v | t3v;
-	return ((int32_t)unsigned_value);
+	return static_cast<int32_t>(unsigned_value);
 }
 
 static int32_t pack24bit_signed(const uint8_t* data) {
@@ -112,6 +106,8 @@ static float ang_vel[3] = {};
 static float accel_vec[3] = {};
 static float mag_vec[3] = {};
 static uint64_t airTimestamp;
+static int64_t rejectionCounters[2] = {}; // [0] = accel, [1] = mag
+static float calculatedError[2] = {}; // [0] = accel in degrees, [1] = mag in degrees
 
 static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample) {
 
@@ -130,13 +126,13 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 	int32_t vel_z = pack24bit_signed(packet->angular_velocity_z);
 
 	//Gyro scale correction
-	float vel_x_cor = (float)vel_z * (float)vel_m / (float)vel_d;
-	float vel_y_cor = (float)vel_x * (float)vel_m / (float)vel_d;
-	float vel_z_cor = (float)vel_y * (float)vel_m / (float)vel_d;
+	float vel_x_cor = (float)vel_x * (float)vel_m / (float)vel_d;
+	float vel_y_cor = (float)vel_y * (float)vel_m / (float)vel_d;
+	float vel_z_cor = (float)vel_z * (float)vel_m / (float)vel_d;
 
 	//Fusion gyro sample
-	out_sample->ang_vel[0] = vel_x_cor;
-	out_sample->ang_vel[1] = vel_y_cor;
+	out_sample->ang_vel[0] = -vel_x_cor;
+	out_sample->ang_vel[1] = -vel_y_cor;
 	out_sample->ang_vel[2] = vel_z_cor;
 
 	//Accel scaling values
@@ -154,8 +150,8 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 	float accel_z_cor = (float)accel_z * (float)accel_m / (float)accel_d;
 
 	//Fusion Accel Sample
-	out_sample->accel[0] = accel_x_cor;
-	out_sample->accel[1] = accel_y_cor;
+	out_sample->accel[0] = -accel_x_cor;
+	out_sample->accel[1] = -accel_y_cor;
 	out_sample->accel[2] = accel_z_cor;
 
 	int32_t magnet_m = pack16bit_signed_swap(packet->magnetic_multiplier);
@@ -180,12 +176,12 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 	
 	airTimestamp = timestamp;
 
-	ang_vel[0] = vel_x_cor;
-	ang_vel[1] = vel_y_cor;
+	ang_vel[0] = -vel_x_cor;
+	ang_vel[1] = -vel_y_cor;
 	ang_vel[2] = vel_z_cor;
 
-	accel_vec[0] = accel_x_cor;
-	accel_vec[1] = accel_y_cor;
+	accel_vec[0] = -accel_x_cor;
+	accel_vec[1] = -accel_y_cor;
 	accel_vec[2] = accel_z_cor;
 
 	mag_vec[0] = mag_x_cor;
@@ -260,7 +256,8 @@ DWORD WINAPI track(LPVOID lpParam) {
 	ThreadParams* params = static_cast<ThreadParams*>(lpParam);
 	//static FusionVector ang_vel = {}, accel_vec = {};
 
-
+	//State Var
+	FusionAhrsInternalStates state;
 
 	// Define calibration (replace with actual calibration data if available)
 	const FusionMatrix gyroscopeMisalignment = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
@@ -306,7 +303,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 		
 		// Acquire latest sensor data
 		//const uint64_t timestamp = sample.tick; // replace this with actual gyroscope timestamp
-		FusionVector gyroscope = { sample.ang_vel[0], sample.ang_vel[1], sample.ang_vel[2] };
+		FusionVector gyroscope = { sample.ang_vel[1], sample.ang_vel[0], sample.ang_vel[2] };
 		
 		FusionVector accelerometer = { sample.accel[0], sample.accel[1], sample.accel[2] };
 
@@ -326,6 +323,30 @@ DWORD WINAPI track(LPVOID lpParam) {
 		static uint64_t previousTimestamp;
 		const float deltaTime = (float)(airTimestamp - previousTimestamp) / (float)1e9;
 		previousTimestamp = airTimestamp;
+
+		//get fusion interal state
+		state = FusionAhrsGetInternalStates(&ahrs);
+
+		//check if rejected and update counter.
+
+		if (state.accelerometerIgnored) {
+			mtx.lock();
+			rejectionCounters[0]++; 
+			mtx.unlock();
+		}
+
+		if (state.magnetometerIgnored){
+			mtx.lock();
+			rejectionCounters[1]++;
+			mtx.unlock();
+		}
+
+		mtx.lock();
+		calculatedError[0] = state.accelerationError;
+		calculatedError[1] = state.magneticError;
+		mtx.unlock();
+
+		
 
 		// Update gyroscope AHRS algorithm
 		mtx.lock();
@@ -581,4 +602,12 @@ uint64_t GetAirTimestamp() {
 	uint64_t ts = airTimestamp;
 	mtx.unlock();
 	return ts;
+}
+
+int64_t* rejctionCountersOut = new int64_t[2];
+int64_t* GetRejectionCounters() {
+	mtx.lock();
+	rejctionCountersOut = rejectionCounters;
+	mtx.unlock();
+	return rejctionCountersOut;
 }

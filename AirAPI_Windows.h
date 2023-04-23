@@ -47,6 +47,11 @@ extern "C" AIR_API int SetFusionMagRejection(float);
 //Function to set mag rejection 
 extern "C" AIR_API int SetFusionRejectTimeout(unsigned int);
 
+//Function to get rejection counters
+extern "C" AIR_API int64_t* GetRejectionCounters();
+
+//Function to get accel and mag error values in degrees
+//extern "C" AIR_API float* GetAccelMagErrorInDegrees();
 
 
 #pragma pack(push, 1)
