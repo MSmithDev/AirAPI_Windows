@@ -303,7 +303,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 		
 		// Acquire latest sensor data
 		//const uint64_t timestamp = sample.tick; // replace this with actual gyroscope timestamp
-		FusionVector gyroscope = { sample.ang_vel[1], sample.ang_vel[0], sample.ang_vel[2] };
+		FusionVector gyroscope = { sample.ang_vel[0], sample.ang_vel[1], sample.ang_vel[2] };
 		
 		FusionVector accelerometer = { sample.accel[0], sample.accel[1], sample.accel[2] };
 
