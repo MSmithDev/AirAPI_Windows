@@ -7,17 +7,18 @@
 #include <array>
 #include <cstdint>
 #include <vector>
-//Air USB VID and PID
+
+// Air USB VID and PID
 #define AIR_VID 0x3318
 #define AIR_PID 0x0424
 
-//Is Tracking
+// Is Tracking
 bool g_isTracking = false;
 
-//Is Listening
+// Is Listening
 bool g_isListening = false;
 
-// ticks are in nanoseconds, 1000 Hz packets
+// Ticks are in nanoseconds, 1000 Hz packets
 #define TICK_LEN (1.0f / 1E9f)
 
 static int rows, cols;
@@ -28,10 +29,11 @@ static FusionQuaternion qt;
 HANDLE trackThread;
 HANDLE listenThread;
 
+// Air endpoints
 hid_device* device;
-
 hid_device* device4;
 
+// Air Polling rate
 #define SAMPLE_RATE (1000) // 1000hz
 
 FusionAhrs ahrs;
@@ -44,6 +46,7 @@ FusionAhrsSettings settings = {
 		.rejectionTimeout = 5 * SAMPLE_RATE, /* 5 seconds */
 };
 
+// Mutex for threads
 std::mutex mtx;
 std::mutex it4;
 
@@ -114,81 +117,87 @@ static int parse_report(AirDataPacket* packet, int size, air_sample* out_sample)
 
 	const uint64_t timestamp = packet->timestamp;
 
+	// Timestamp
 	out_sample->tick = timestamp;
 	
-	//Gyro scaling values
+	// Gyro scaling values
 	int32_t vel_m = pack16bit_signed(packet->angular_multiplier);
 	int32_t vel_d = pack32bit_signed(packet->angular_divisor);
 	
-	//Gyro conversion to 32bit signed
+	// Gyro conversion to 32bit signed
 	int32_t vel_x = pack24bit_signed(packet->angular_velocity_x);
 	int32_t vel_y = pack24bit_signed(packet->angular_velocity_y);
 	int32_t vel_z = pack24bit_signed(packet->angular_velocity_z);
 
-	//Gyro scale correction
+	// Gyro scale correction
 	float vel_x_cor = (float)vel_x * (float)vel_m / (float)vel_d;
 	float vel_y_cor = (float)vel_y * (float)vel_m / (float)vel_d;
 	float vel_z_cor = (float)vel_z * (float)vel_m / (float)vel_d;
 
-	//Fusion gyro sample
-	out_sample->ang_vel[0] = -vel_x_cor;
-	out_sample->ang_vel[1] = -vel_y_cor;
+	// Fusion gyro sample
+	out_sample->ang_vel[0] = vel_x_cor; //neg
+	out_sample->ang_vel[1] = vel_y_cor; //neg
 	out_sample->ang_vel[2] = vel_z_cor;
 
-	//Accel scaling values
+	// Accel scaling values
 	int32_t accel_m = pack16bit_signed(packet->acceleration_multiplier);
 	int32_t accel_d = pack32bit_signed(packet->acceleration_divisor);
 
-	//Accel conversion to 32bit signed int
+	// Accel conversion to 32bit signed int
 	int32_t accel_x = pack24bit_signed(packet->acceleration_x);
 	int32_t accel_y = pack24bit_signed(packet->acceleration_y);
 	int32_t accel_z = pack24bit_signed(packet->acceleration_z);
 
-
+	// Accel scale correction
 	float accel_x_cor = (float)accel_x * (float)accel_m / (float)accel_d;
 	float accel_y_cor = (float)accel_y * (float)accel_m / (float)accel_d;
 	float accel_z_cor = (float)accel_z * (float)accel_m / (float)accel_d;
 
-	//Fusion Accel Sample
-	out_sample->accel[0] = -accel_x_cor;
-	out_sample->accel[1] = -accel_y_cor;
+	// Fusion Accel Sample
+	out_sample->accel[0] = accel_x_cor; //neg
+	out_sample->accel[1] = accel_y_cor; //neg
 	out_sample->accel[2] = accel_z_cor;
 
+	// Mag scaling values
 	int32_t magnet_m = pack16bit_signed_swap(packet->magnetic_multiplier);
 	int32_t magnet_d = pack32bit_signed_swap(packet->magnetic_divisor);
 
+	// Mag conversion to 32bit signed int
 	int16_t magnet_x = pack16bit_signed_swap(packet->magnetic_x);
 	int16_t magnet_y = pack16bit_signed_swap(packet->magnetic_y);
 	int16_t magnet_z = pack16bit_signed_swap(packet->magnetic_z);
 
+	// Mag scale correction
 	float mag_x_cor = (float)magnet_x * (float)magnet_m / (float)magnet_d;
 	float mag_y_cor = (float)magnet_y * (float)magnet_m / (float)magnet_d;
 	float mag_z_cor = (float)magnet_z * (float)magnet_m / (float)magnet_d;
 
-	//Fusion Mag Sample
+	// Fusion Mag Sample
 	out_sample->mag[0] = mag_x_cor;
 	out_sample->mag[1] = mag_y_cor;
 	out_sample->mag[2] = mag_z_cor;
 
 
-	//lock and update the global variables
+	// Lock and update the global variables
 	mtx.lock();
-	
+	// Timestamp
 	airTimestamp = timestamp;
-
-	ang_vel[0] = -vel_x_cor;
-	ang_vel[1] = -vel_y_cor;
+	
+	// Raw gyro values
+	ang_vel[0] = vel_x_cor; //neg
+	ang_vel[1] = vel_y_cor; //neg
 	ang_vel[2] = vel_z_cor;
 
-	accel_vec[0] = -accel_x_cor;
-	accel_vec[1] = -accel_y_cor;
+	// Raw accel values
+	accel_vec[0] = accel_x_cor; //neg
+	accel_vec[1] = accel_y_cor; //neg
 	accel_vec[2] = accel_z_cor;
 
+	// Raw mag values
 	mag_vec[0] = mag_x_cor;
 	mag_vec[1] = mag_y_cor;
 	mag_vec[2] = mag_z_cor;
 	mtx.unlock();
-
 
 	return 1;
 }
@@ -236,25 +245,19 @@ open_device4()
 	return device;
 }
 
+// Pass params to thread
 struct ThreadParams {
 	hid_device* device;
 };
 
-
-
-
-
 DWORD WINAPI track(LPVOID lpParam) {
 
-	//Thread to handle tracking
-	//unsigned char buffer[64] = {};
 	AirDataPacket buffer;
 	memset(&buffer, 0, sizeof(AirDataPacket));
 
 	uint64_t last_sample_tick = 0;
 	air_sample sample = {};
 	ThreadParams* params = static_cast<ThreadParams*>(lpParam);
-	//static FusionVector ang_vel = {}, accel_vec = {};
 
 	//State Var
 	FusionAhrsInternalStates state;
@@ -269,10 +272,11 @@ DWORD WINAPI track(LPVOID lpParam) {
 	const FusionMatrix softIronMatrix = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 	const FusionVector hardIronOffset = { 0.0f, 0.0f, 0.0f };
 
+	//Alignment for Air's
+	const FusionAxesAlignment alignment = FusionAxesAlignmentNXNYPZ;
 
 	// Initialise algorithms
 	FusionOffset offset;
-
 
 	FusionOffsetInitialise(&offset, SAMPLE_RATE);
 	mtx.lock();
@@ -285,36 +289,33 @@ DWORD WINAPI track(LPVOID lpParam) {
 
 
 		try {
-			// code that might throw an exception
+			// Attempt a HID read
 			int res = hid_read(device, (uint8_t*)&buffer, sizeof(buffer));
 			if (res < 0) {
 				break;
 			}
 		}
 		catch (const std::exception& e) {
-			// handle the exception
+			// Exception
 			std::cerr << e.what();
 		}
 
 
-		//parse
+		// Parse HID report
 		parse_report(&buffer, sizeof(buffer), &sample);
 
-		
 		// Acquire latest sensor data
-		//const uint64_t timestamp = sample.tick; // replace this with actual gyroscope timestamp
 		FusionVector gyroscope = { sample.ang_vel[0], sample.ang_vel[1], sample.ang_vel[2] };
-		
 		FusionVector accelerometer = { sample.accel[0], sample.accel[1], sample.accel[2] };
-
-		
-
-		//FusionVector gyroscope = { ang_vel[0], ang_vel[1], ang_vel[2] }; // replace this with actual gyroscope data in degrees/s
-		//FusionVector accelerometer = { accel_vec[0], accel_vec[1], accel_vec[2] }; // replace this with actual accelerometer data in g
 
 		// Apply calibration
 		gyroscope = FusionCalibrationInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
 		accelerometer = FusionCalibrationInertial(accelerometer, accelerometerMisalignment, accelerometerSensitivity, accelerometerOffset);
+
+		// Apply Swap
+		gyroscope = FusionAxesSwap(gyroscope, alignment);
+		accelerometer = FusionAxesSwap(accelerometer, alignment);
+		//magnetometer = FusionAxesSwap(magnetometer, alignment);
 
 		// Update gyroscope offset correction algorithm
 		gyroscope = FusionOffsetUpdate(&offset, gyroscope);
@@ -324,11 +325,10 @@ DWORD WINAPI track(LPVOID lpParam) {
 		const float deltaTime = (float)(airTimestamp - previousTimestamp) / (float)1e9;
 		previousTimestamp = airTimestamp;
 
-		//get fusion interal state
+		// Get fusion interal state
 		state = FusionAhrsGetInternalStates(&ahrs);
 
-		//check if rejected and update counter.
-
+		// Check if rejected and update counter.
 		if (state.accelerometerIgnored) {
 			mtx.lock();
 			rejectionCounters[0]++; 
@@ -353,7 +353,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 		FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, deltaTime);
 		mtx.unlock();
 
-		//lock mutex and update values
+		// Lock mutex and update values
 		mtx.lock();
 		qt = FusionAhrsGetQuaternion(&ahrs);
 		euler = FusionQuaternionToEuler(qt);
@@ -367,7 +367,7 @@ DWORD WINAPI track(LPVOID lpParam) {
 int brightness = 0;
 DWORD WINAPI interface4Handler(LPVOID lpParam) {
 	
-	//get initial brightness from device
+	// Get initial brightness from device
 	std::array<uint8_t, 17> initBrightness = { 0x00, 0xfd, 0x1e, 0xb9, 0xf0, 0x68, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03 };
 	hid_write(device4, initBrightness.data(), initBrightness.size());
 	
@@ -378,32 +378,32 @@ DWORD WINAPI interface4Handler(LPVOID lpParam) {
 		if (res > 0) {
 			switch (recv[22]) {
 
-			case 0x03: //Brightness down press
+			case 0x03: // Brightness down press
 				it4.lock();
 				brightness = recv[30];
 				it4.unlock();
 				break;
 
-			case 0x02: //Brightness up press
+			case 0x02: // Brightness up press
 				it4.lock();
 				brightness = recv[30];
 				it4.unlock();
 				break;
 			default:
-				//std::cout << "Unknown Packet! " << (int)recv[22] << std::endl;
+				// Uknown packet
 				break;
 			}
 
 			switch (recv[15]) {
 
-			case 0x03: //Brightness from cmd
+			case 0x03: // Brightness from cmd
 				it4.lock();
 				brightness = recv[23];
 				it4.unlock();
 				break;
 
 			default:
-				//todo
+				// Todo
 				break;
 			}
 		}
@@ -422,7 +422,7 @@ int StartConnection()
 	}
 	else {
 		std::cout << "Opening Device" << std::endl;
-		// open device
+		// Open device
 		device = open_device();
 		device4 = open_device4();
 		if (!device || !device4) {
@@ -432,7 +432,7 @@ int StartConnection()
 
 
 		std::cout << "Sending Payload" << std::endl;
-		// open the floodgates
+		// Open the floodgates
 		uint8_t magic_payload[] = { 0x00, 0xaa, 0xc5, 0xd1, 0x21, 0x42, 0x04, 0x00, 0x19, 0x01 };
 
 
@@ -446,7 +446,7 @@ int StartConnection()
 		std::cout << "Tracking Starting Thread" << std::endl;
 
 
-		//Start Tracking Thread
+		// Start Tracking Thread
 		trackThread = CreateThread(NULL, 0, track, &trackParams, 0, NULL);
 		if (trackThread == NULL) {
 			std::cout << "Failed to create thread" << std::endl;
@@ -455,7 +455,7 @@ int StartConnection()
 
 		ThreadParams listenParams = { };
 		g_isListening = true;
-		//Start Interface 4 listener
+		// Start Interface 4 listener
 		listenThread = CreateThread(NULL, 0, interface4Handler, &listenParams, 0, NULL);
 		if (listenThread == NULL) {
 			std::cout << "Failed to create thread" << std::endl;
@@ -610,4 +610,12 @@ int64_t* GetRejectionCounters() {
 	rejctionCountersOut = rejectionCounters;
 	mtx.unlock();
 	return rejctionCountersOut;
+}
+
+float* rejectionErrorDegrees = new float[2];
+float* GetRejectionErrorDegrees() {
+	mtx.lock();
+	rejectionErrorDegrees = calculatedError;
+	mtx.unlock();
+	return rejectionErrorDegrees;
 }
