@@ -10,6 +10,8 @@
 //Air USB VID and PID
 #define AIR_VID 0x3318
 #define AIR_PID 0x0424
+#define AIR_2_PID 0x0428
+#define AIR_2_PRO_PID 0x0432
 
 //Is Tracking
 bool g_isTracking = false;
@@ -215,8 +217,27 @@ process_accel(const int32_t in_accel[3], float out_vec[])
 static hid_device*
 open_device()
 {
-	struct hid_device_info* devs = hid_enumerate(AIR_VID, AIR_PID);
-	struct hid_device_info* cur_dev = devs;
+	struct hid_device_info* devs = NULL;
+	struct hid_device_info* devs_1 = hid_enumerate(AIR_VID, AIR_PID);
+	struct hid_device_info* devs_2 = hid_enumerate(AIR_VID, AIR_2_PID);
+	struct hid_device_info* devs_2_pro = hid_enumerate(AIR_VID, AIR_2_PRO_PID);
+	
+	struct hid_device_info* cur_dev = NULL;
+
+	if (devs_1 != NULL) {
+		cur_dev = devs_1;
+		devs = devs_1;
+	}
+	else if (devs_2 != NULL) {
+		cur_dev = devs_2;
+		devs = devs_2;
+
+	}
+	else if (devs_2_pro != NULL) {
+		cur_dev = devs_2_pro;
+		devs = devs_2_pro;
+	}
+
 	hid_device* device = NULL;
 
 	while (devs) {
@@ -236,8 +257,26 @@ open_device()
 static hid_device*
 open_device4()
 {
-	struct hid_device_info* devs = hid_enumerate(AIR_VID, AIR_PID);
-	struct hid_device_info* cur_dev = devs;
+	struct hid_device_info* devs = NULL;
+	struct hid_device_info* devs_1 = hid_enumerate(AIR_VID, AIR_PID);
+	struct hid_device_info* devs_2 = hid_enumerate(AIR_VID, AIR_2_PID);
+	struct hid_device_info* devs_2_pro = hid_enumerate(AIR_VID, AIR_2_PRO_PID);
+
+	struct hid_device_info* cur_dev = NULL;
+
+	if (devs_1 != NULL) {
+		cur_dev = devs_1;
+		devs = devs_1;
+	}
+	else if (devs_2 != NULL) {
+		cur_dev = devs_2;
+		devs = devs_2;
+
+	}
+	else if (devs_2_pro != NULL) {
+		cur_dev = devs_2_pro;
+		devs = devs_2_pro;
+	}
 	hid_device* device = NULL;
 
 	while (devs) {
