@@ -144,7 +144,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>Fusion.lib;hidapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)\deps\hidapi-win\x64;$(ProjectDir)\deps\Fusion\Fusion\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)\deps\hidapi-win\x64;$(ProjectDir)\deps\Fusion\Fusion\Release;%(AdditionalLibraryDirectories):$(ProjectDir)\deps\hidapi-win\x64;$(ProjectDir)\deps\Fusion\Fusion\out\build\x64-Debug\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
