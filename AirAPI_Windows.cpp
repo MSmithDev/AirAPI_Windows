@@ -359,7 +359,7 @@ DWORD WINAPI interface4Handler(LPVOID lpParam) {
 	std::array<uint8_t, 17> initBrightness = { 0x00, 0xfd, 0x1e, 0xb9, 0xf0, 0x68, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03 };
 	hid_write(device4, initBrightness.data(), initBrightness.size());
 	
-
+	
 	while (g_isListening) {
 		std::array<uint8_t, 65> recv = {};
 		int res = hid_read(device4, recv.data(), recv.size());
@@ -396,6 +396,7 @@ DWORD WINAPI interface4Handler(LPVOID lpParam) {
 			}
 		}
 	}
+	return 0;
 }
 
 
