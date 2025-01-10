@@ -12,6 +12,7 @@
 #define AIR_PID 0x0424
 #define AIR_2_PID 0x0428
 #define AIR_2_PRO_PID 0x0432
+#define AIR_2_ULTRA_PID 0x0426
 
 //Is Tracking
 bool g_isTracking = false;
@@ -213,29 +214,34 @@ process_accel(const int32_t in_accel[3], float out_vec[])
 
 }
 
-static hid_device* open_device_by_interface(int interface_number)
+static hid_device_info* open_device()
 {
 	struct hid_device_info* devs = NULL;
 	struct hid_device_info* devs_1 = hid_enumerate(AIR_VID, AIR_PID);
 	struct hid_device_info* devs_2 = hid_enumerate(AIR_VID, AIR_2_PID);
 	struct hid_device_info* devs_2_pro = hid_enumerate(AIR_VID, AIR_2_PRO_PID);
-
-	struct hid_device_info* cur_dev = NULL;
+	struct hid_device_info* devs_2_ultra = hid_enumerate(AIR_VID, AIR_2_ULTRA_PID);
 
 	if (devs_1 != NULL) {
-		cur_dev = devs_1;
 		devs = devs_1;
 	}
 	else if (devs_2 != NULL) {
-		cur_dev = devs_2;
 		devs = devs_2;
 	}
 	else if (devs_2_pro != NULL) {
-		cur_dev = devs_2_pro;
 		devs = devs_2_pro;
 	}
+	else if (devs_2_ultra != NULL) {
+		devs = devs_2_ultra;
+	}
 
+	return devs;
+}
+
+static hid_device* open_device_by_interface(struct hid_device_info* devs, int interface_number)
+{
 	hid_device* device = NULL;
+	struct hid_device_info* cur_dev = devs;
 
 	while (devs) {
 		if (cur_dev->interface_number == interface_number) {
@@ -247,7 +253,6 @@ static hid_device* open_device_by_interface(int interface_number)
 		cur_dev = cur_dev->next;
 	}
 
-	hid_free_enumeration(devs);
 	return device;
 }
 
@@ -408,8 +413,17 @@ int StartConnection()
 	else {
 		std::cout << "Opening Device" << std::endl;
 		// open devices
-		device = open_device_by_interface(3); // for interface 3
-		device4 = open_device_by_interface(4); // for interface 4
+		struct hid_device_info* devs = open_device();
+		if (devs->product_id == AIR_2_ULTRA_PID) {
+			device  = open_device_by_interface(devs, 2); // for interface 3
+			device4 = open_device_by_interface(devs, 8); // for interface 4
+		}
+		else {
+			// for Air, Air2, and Air2 Pro
+			device  = open_device_by_interface(devs, 3); // for interface 3
+			device4 = open_device_by_interface(devs, 4); // for interface 4
+		}
+		hid_free_enumeration(devs);
 		if (!device || !device4) {
 			std::cout << "Unable to open device" << std::endl;
 			return 1;
